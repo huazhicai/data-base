@@ -51,7 +51,8 @@ def connect(db, dbName):
             conn = pymysql.connect(host='localhost', port=3306,
                                    user='root', password='110',
                                    database=dbName)
-        except DB_EXC.OperationalError as e:
+        #
+        except DB_EXC.err.InternalError as e:
             print('mysql:{}'.format(str(e)))
             conn = pymysql.connect(host='localhost', port=3306,
                                    user='root', password='110')
@@ -60,7 +61,7 @@ def connect(db, dbName):
                 cur.execute('drop database {}'.format(dbName))
             except Exception as e:
                 pass
-            cur.execute('crate database %s' % dbName)
+            cur.execute('create database %s' % dbName)
             cur.execute("grant all on {0}.* to '{1}'@'localhost'".format(dbName, 'root)'))
             cur.commit()
             cur.close()
@@ -119,11 +120,12 @@ def create(cur):
         drop(cur)
         create(cur)
 
+
 drop = lambda cur: cur.execute('drop table users')
 
 NAMES = (
     ('aaron', 8312), ('angela', 7603), ('dave', 7306),
-    ('davina',7902), ('elliot', 7911), ('ernie', 7410),
+    ('davina', 7902), ('elliot', 7911), ('ernie', 7410),
     ('jess', 7912), ('jim', 7512), ('larry', 7311),
     ('leslie', 7808), ('melissa', 8602), ('pat', 7711),
     ('serena', 7003), ('stan', 7607), ('faye', 6812),
@@ -131,13 +133,30 @@ NAMES = (
 )
 
 
-def readName():
+# 随机读取名字
+def randName():
     pick = list(NAMES)
+    while len(pick) > 0:
+        # rrange(16), 相当于从[0, 1 ... 15]中随机获取一个数字
+        yield pick.pop(rrange(len(pick)))
+
+
+def insert(cur, db):
+    if db == 'sqlite':
+        cur.executemany("insert into users values(?, ?, ?)",
+                        [(who, uid, rrange(1, 5)) for who, uid in randName()])
+    elif db == 'mysql':
+        cur.executemany("insert into users values(%s, %s, %s)",
+                        [(who, uid, rrange(1, 5)) for who, uid in randName()])
+    elif db == 'postgresql':
+        cur.executemany("insert into users values(%s, %s, %s)",
+                        [(who, uid, rrange(1, 5)) for who, uid in randName()])
+
 
 def main():
     db = setup()
     print("*** Connecting to %r database" % db)
-    conn = connect(db, 'test')
+    conn = connect(db, 'test01')
     if not conn:
         print("\nERROR: %r not supported, exiting" % db)
         return None
@@ -145,6 +164,10 @@ def main():
 
     print("\n*** Creating users table")
     create(cur)
+
+    print("\n*** Inserting names into table")
+    insert(cur, db)
+    # dbDump(cur)
 
 
 if __name__ == '__main__':
